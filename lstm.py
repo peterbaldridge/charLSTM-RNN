@@ -1,4 +1,3 @@
-# Import modules
 import numpy as np
 import theano
 from theano import In
@@ -6,25 +5,7 @@ from theano import tensor as T
 from theano import function
 from theano import shared
 
-# Session variables
-floatX = 'float32'
-
-# Data I/O
-data = open('yoursourcetext.txt', 'r').read()
-chars = sorted(list(set(data)))
-data_size, vocab_size = len(data), len(chars)
-print('data has %d characters, %d unique.' % (data_size, vocab_size))
-char_to_ix = { ch:i for i,ch in enumerate(chars) }
-ix_to_char = { i:ch for i,ch in enumerate(chars) }
-
-# Vectorize data
-chars_as_vectors = np.zeros((data_size,vocab_size)).astype(dtype=floatX)
-for x in range(0,len(chars_as_vectors)):
-    char = data[x]
-    char_id = char_to_ix[char]
-    chars_as_vectors[x,char_id] = 1
-
-# Scalable LSTM module
+# LSTM cell
 class LSTM:
     def __init__(self,x_dim,h_dim,temperature = 1.0):
         # LSTM Block Right
@@ -310,7 +291,9 @@ class LSTM:
     def update_weightsEDGE(self,batch_size):
         self.back_prop_update_weightsEDGE(batch_size,self.learning_rate)
 
-# Recurrent neural network (LSTM wrapper)
+# Recurrent neural network
+# Maintains the dimensions and functionality
+# of the LSTM network
 class RNN:
     def __init__(self,rnn_structure,x_h_dim,softmax_temperature=1.0):
         # log inputs
@@ -516,63 +499,3 @@ class RNN:
                 p_dropout = lstm.p_dropout
                 h_dim = lstm.h_dim
                 lstm.dropout_vector.set_value(np.random.choice([0, 1], size=(h_dim,), p=[p_dropout,1-p_dropout]).astype(dtype=floatX))
-
-# Ix-to-char
-def unit_to_char(data):
-    char = ""
-    for x in range(0,len(data)):
-        char_id = np.argmax(data[x])
-        char += ix_to_char[char_id]
-    return char
-# Save RNN to CSV
-def save_rnn_csv(rnn, folder_name):
-    import os
-    import pickle
-    file_prefix = folder_name + '/'
-    # create folder if it doesn't exist already
-    if(os.path.exists(folder_name) == False):
-        os.makedirs(folder_name)
-    # clear folder
-    files = os.listdir(folder_name)
-    for file in files:
-        os.remove(folder_name + '/' + file)
-    pickle.dump(chars,open(file_prefix + "chars.obj","wb"))
-    for x in range(0,rnn.network_depth):
-        for y in range(0,rnn.network_width):
-            lstm = rnn.lstm_network[x][y]
-            # x-matrices
-            pickle.dump(lstm.Wx.get_value(),open(file_prefix + str(x)+str(y)+'Wx.obj','wb'))
-
-            # h-matrices
-            pickle.dump(lstm.Wh.get_value(),open(file_prefix + str(x)+str(y)+'Wh.obj','wb'))
-
-            # b-vectors
-            pickle.dump(lstm.B.get_value(),open(file_prefix + str(x)+str(y)+'B.obj','wb'))
-# Load RNN from CSV
-def load_rnn_csv(rnn, folder_name):
-    import os
-    import pickle
-    file_prefix = folder_name + '/'
-    chars = pickle.load(open(file_prefix + "chars.obj","rb"))
-    for x in range(0,rnn.network_depth):
-        for y in range(0,rnn.network_width):
-            lstm = rnn.lstm_network[x][y]
-            # x-matrices
-            lstm.Wx.set_value(pickle.load(open(file_prefix + str(x) + str(y) + "Wx.obj",'rb')))
-
-            # h-matrices
-            lstm.Wh.set_value(pickle.load(open(file_prefix + str(x) + str(y) + "Wh.obj",'rb')))
-
-            # b-vectors
-            lstm.B.set_value(pickle.load(open(file_prefix + str(x) + str(y) + "B.obj",'rb')))
-    return chars
-
-
-# Initialize RNN
-self = RNN((3,5),(vocab_size,32,32,vocab_size),softmax_temperature=1.0)
-
-# Train RNN for 50 epochs and print training results
-####################
-for x in range(0,50):
-    self.train(chars_as_vectors,128)
-    print(unit_to_char(self.predict(chars_as_vectors[:self.network_width],100,False)))
